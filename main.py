@@ -33,13 +33,19 @@ class MyClient(discord.Client):
             soup = BeautifulSoup(data.content, 'html.parser')
             s = soup.find_all('div', class_="priceValue___11gHJ")[0].get_text()
             try:
-                old_price = self.crypto_prices[count]
-                old_price = old_price.strip('$')
-                old_price = float(old_price)
-                new_price = s.strip('$')
-                new_price = float(new_price)
-                if new_price > old_price:
-                    #We want to inform the user of the change
+                # old_price = self.crypto_prices[count]
+                # old_price = old_price.strip('$')
+                # old_price = float(old_price)
+                # new_price = s.strip('$')
+                # new_price = float(new_price)
+                # if new_price > old_price:
+                #     #We want to inform the user of the change
+                #     difference = new_price - old_price
+                #     await channel.send(crypto + ' Price has RISEN! The price rise was ' +str(difference) + ' It now sits at '+ str(s))
+                # if old_price > new_price:
+                #     #We want to inform the user of the change
+                #     difference = old_price - new_price
+                #     await channel.send(crypto + ' Price has DROPPED! The price drop was ' +str(difference) + ' It now sits at '+ str(s))
                 self.crypto_prices[count] = s
             except IndexError:
                 self.crypto_prices.append(s)
@@ -76,5 +82,5 @@ class MyClient(discord.Client):
 
 
 client = MyClient()
-client.run('TOKEN')
+client.run('Token')
 

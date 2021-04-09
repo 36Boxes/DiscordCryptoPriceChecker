@@ -9,13 +9,9 @@ class MyClient(discord.Client):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # an attribute we can access from our task
-        self.counter = 0
-
-        self.cryptoToCheck = []
+        self.cryptoToCheck = ['Ankr', 'Decentraland', 'Tezos', 'Multi-Collateral-Dai', 'Algorand', 'Celo', 'Stellar', 'The-Graph']
         self.new_crypto = False
         self.crypto_prices = []
-        # start the task to run in the background
         self.my_background_task.start()
 
     async def on_ready(self):
@@ -26,36 +22,30 @@ class MyClient(discord.Client):
 
     @tasks.loop(seconds=10) # task runs every 60 seconds
     async def my_background_task(self):
+        channel = self.get_channel(830032107135827970)
         for count,crypto in enumerate(self.cryptoToCheck):
-            channel = self.get_channel(830032107135827970) # channel ID goes here
             r = requests.session()
-            data = r.get('https://coinmarketcap.com/currencies/'+crypto)
+            r.get('https://coinmarketcap.com/currencies/'+crypto)
+            r.cookies.set('currency', 'GBP')
+            data = r.get('https://coinmarketcap.com/currencies/' + crypto)
             soup = BeautifulSoup(data.content, 'html.parser')
             s = soup.find_all('div', class_="priceValue___11gHJ")[0].get_text()
             try:
-                # old_price = self.crypto_prices[count]
-                # old_price = old_price.strip('$')
-                # old_price = float(old_price)
-                # new_price = s.strip('$')
-                # new_price = float(new_price)
-                # if new_price > old_price:
-                #     #We want to inform the user of the change
-                #     difference = new_price - old_price
-                #     await channel.send(crypto + ' Price has RISEN! The price rise was ' +str(difference) + ' It now sits at '+ str(s))
-                # if old_price > new_price:
-                #     #We want to inform the user of the change
-                #     difference = old_price - new_price
-                #     await channel.send(crypto + ' Price has DROPPED! The price drop was ' +str(difference) + ' It now sits at '+ str(s))
+                old_price = float(self.crypto_prices[count].strip('£'))
+                new_price = float(s.strip('£'))
+                if new_price > old_price:
+                    #We want to inform the user of the change
+                    await channel.send(crypto + ' Price has RISEN! It now sits at '+ str(s)  +  '   @everyone')
+                if old_price > new_price:
+                    #We want to inform the user of the change
+                    await channel.send(crypto + ' Price has DROPPED! It now sits at '+ str(s)  +  '   @everyone')
                 self.crypto_prices[count] = s
             except IndexError:
                 self.crypto_prices.append(s)
-            print(self.crypto_prices)
-            print(self.cryptoToCheck)
             await channel.send(crypto + ' Price is : ' + str(s))
 
     @my_background_task.before_loop
     async def before_my_task(self):
-        # wait until the bot logs in
         await self.wait_until_ready()
 
     async def on_message(self, message):
@@ -82,5 +72,5 @@ class MyClient(discord.Client):
 
 
 client = MyClient()
-client.run('Token')
+client.run('token')
 

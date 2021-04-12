@@ -50,15 +50,15 @@ class MyClient(discord.Client):
             if price > previous_price:
                 live_price = Decimal(price)
                 prev_price = Decimal(previous_price)
-                percentage_change = 100 * live_price / prev_price
+                percentage_change = live_price - prev_price
 
-                await channel.send(crypto + ' has risen by ' + str(percentage_change) +'%! @everyone')
+                await channel.send(crypto + ' has risen by ' + str(percentage_change) +'%!')
             if previous_price > price:
                 live_price = Decimal(price)
                 prev_price = Decimal(previous_price)
-                percentage_change = 100 * live_price / prev_price
+                percentage_change = prev_price - live_price
 
-                await channel.send(crypto + ' has dropped by ' + str(percentage_change) +'%! @everyone')
+                await channel.send(crypto + ' has dropped by ' + str(percentage_change) +'%!')
 
             try:
                 test = float(self.crypto_dict["price_alert_low"][count])

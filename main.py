@@ -37,6 +37,7 @@ class MyClient(discord.Client):
 
             try:
                 previous_price = float(self.crypto_dict["live_price"][count])
+                self.crypto_dict["live_price"][count] = price
             except IndexError:
                 self.crypto_dict["live_price"].append(price)
                 self.crypto_dict["price_alert_high"].append(None)
@@ -46,6 +47,7 @@ class MyClient(discord.Client):
             # Add some different logic for smaller value coins
 
             digits_long = self.figure_out_how_many_digits(str(price))
+
 
             if price > previous_price:
                 live_price = Decimal(price)

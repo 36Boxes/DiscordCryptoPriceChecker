@@ -10,7 +10,7 @@ class MyClient(discord.Client):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.crypto_dict = {
-            'name': ['Ankr'],
+            'name': ['Ankr', 'Maker', 'Enjin-coin', 'Tezos', 'Algorand', 'Bitcoin-cash', '1Inch', 'Decentraland', 'The-Graph'],
             'live_price': [],
             'price_alert_high': [],
             'price_alert_low': [],
@@ -24,14 +24,18 @@ class MyClient(discord.Client):
         print(self.user.id)
         print('------')
 
-    @tasks.loop(seconds=0.1) # task runs every 60 seconds
+    @tasks.loop(seconds=0.5) # task runs every 60 seconds
     async def my_background_task(self):
         channel = self.get_channel(831227248139829319)
+        price_change_channel = self.get_channel(831497226982260746)
         for count,crypto in enumerate(self.crypto_dict['name']):
             data = self.get_crypto_data(crypto_name=crypto)
             soup = BeautifulSoup(data.content, 'html.parser')
             price = soup.find_all('div', class_="priceValue___11gHJ")[0].get_text()
-            price = float(price.strip('£'))
+            price = price.strip('£')
+            price = price.replace(',', '')
+            price = float(price)
+
 
             # Try and get previous price, this produces index error on first run
 
@@ -47,20 +51,23 @@ class MyClient(discord.Client):
             # Add some different logic for smaller value coins
 
             digits_long = self.figure_out_how_many_digits(str(price))
-
+            chanel =  self.get_channel(831496686051393537)
+            await chanel.send(str(crypto) + ' price is £'+str(price))
 
             if price > previous_price:
                 live_price = Decimal(price)
                 prev_price = Decimal(previous_price)
                 percentage_change = live_price - prev_price
+                percentage_change = percentage_change/prev_price * 100
 
-                await channel.send(crypto + ' has risen by ' + str(percentage_change) +'%!')
+                await price_change_channel.send(crypto + ' has risen to £' + str(price) +'! @everyone')
             if previous_price > price:
                 live_price = Decimal(price)
                 prev_price = Decimal(previous_price)
                 percentage_change = prev_price - live_price
+                percentage_change = percentage_change / live_price * 100
 
-                await channel.send(crypto + ' has dropped by ' + str(percentage_change) +'%!')
+                await price_change_channel.send(crypto + ' has dropped to £' + str(price) +'! @everyone')
 
             try:
                 test = float(self.crypto_dict["price_alert_low"][count])
@@ -72,6 +79,11 @@ class MyClient(discord.Client):
                 # We need to alert the user the crypto has gone to the low they want
 
                 await channel.send(crypto + ' has dropped to buying price of £' + str(price) + ' @everyone')
+
+            try:
+                test = float(self.crypto_dict["price_alert_high"][count])
+            except TypeError:
+                continue
 
             if float(self.crypto_dict["price_alert_high"][count]) <= price:
 

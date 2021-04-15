@@ -1,8 +1,11 @@
 from discord.ext import tasks
 import requests
-from bs4 import BeautifulSoup
 import discord
 from decimal import Decimal
+from coinbase.wallet.client import Client
+from coinbase.wallet.error import NotFoundError
+
+
 
 
 class MyClient(discord.Client):
@@ -10,13 +13,23 @@ class MyClient(discord.Client):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.crypto_dict = {
-            'name': ['Ankr', 'Maker', 'Enjin-coin', 'Tezos', 'Algorand', 'Bitcoin-cash', '1Inch', 'Decentraland', 'The-Graph'],
+            'name': [],
             'live_price': [],
             'price_alert_high': [],
             'price_alert_low': [],
+            'mute': [],
+
         }
         self.new_crypto = False
+        self.min_1 = True
+        self.min_2 = False
+        self.min_3 = False
+        self.first_run_complete = False
         self.my_background_task.start()
+        self.walit = Client('<COINBASEAPIKEYS>', '<COINBASEAPIKEYS>')
+        pop = self.walit.get_accounts()
+        for currency in pop.get('data'):
+            self.crypto_dict.get('name').append(currency.get('currency'))
 
     async def on_ready(self):
         print('Logged in as')
@@ -28,14 +41,13 @@ class MyClient(discord.Client):
     async def my_background_task(self):
         channel = self.get_channel(831227248139829319)
         price_change_channel = self.get_channel(831497226982260746)
+        target_price_channel = self.get_channel(832183660421185557)
         for count,crypto in enumerate(self.crypto_dict['name']):
-            data = self.get_crypto_data(crypto_name=crypto)
-            soup = BeautifulSoup(data.content, 'html.parser')
-            price = soup.find_all('div', class_="priceValue___11gHJ")[0].get_text()
-            price = price.strip('£')
-            price = price.replace(',', '')
-            price = float(price)
-
+            try:
+                data = self.walit.get_buy_price(currency_pair=crypto+'-GBP')
+            except NotFoundError:
+                continue
+            price = data.get('amount')
 
             # Try and get previous price, this produces index error on first run
 
@@ -46,48 +58,53 @@ class MyClient(discord.Client):
                 self.crypto_dict["live_price"].append(price)
                 self.crypto_dict["price_alert_high"].append(None)
                 self.crypto_dict["price_alert_low"].append(None)
+                self.crypto_dict["mute"].append(False)
+                self.first_run_complete = True
                 continue
 
             # Add some different logic for smaller value coins
 
             digits_long = self.figure_out_how_many_digits(str(price))
             chanel =  self.get_channel(831496686051393537)
-            await chanel.send(str(crypto) + ' price is £'+str(price))
+            if self.crypto_dict['mute'][count] is True:
+                continue
+            else:
+                await chanel.send(str(crypto) + ' price is £'+str(price))
 
-            if price > previous_price:
+            if float(price) > float(previous_price):
                 live_price = Decimal(price)
                 prev_price = Decimal(previous_price)
                 percentage_change = live_price - prev_price
                 percentage_change = percentage_change/prev_price * 100
 
-                await price_change_channel.send(crypto + ' has risen to £' + str(price) +'! @everyone')
-            if previous_price > price:
+                await price_change_channel.send(crypto + ' has risen to £' + str(price) +'!')
+            if float(previous_price) > float(price):
                 live_price = Decimal(price)
                 prev_price = Decimal(previous_price)
                 percentage_change = prev_price - live_price
                 percentage_change = percentage_change / live_price * 100
 
-                await price_change_channel.send(crypto + ' has dropped to £' + str(price) +'! @everyone')
+                await price_change_channel.send(crypto + ' has dropped to £' + str(price) +'!')
 
             try:
                 test = float(self.crypto_dict["price_alert_low"][count])
             except TypeError:
                 continue
 
-            if float(self.crypto_dict["price_alert_low"][count]) >= price:
+            if float(self.crypto_dict["price_alert_low"][count]) >= float(price):
 
                 # We need to alert the user the crypto has gone to the low they want
 
-                await channel.send(crypto + ' has dropped to buying price of £' + str(price) + ' @everyone')
+                await target_price_channel.send(crypto + ' has dropped to buying price of £' + str(price) + ' @everyone')
 
             try:
                 test = float(self.crypto_dict["price_alert_high"][count])
             except TypeError:
                 continue
 
-            if float(self.crypto_dict["price_alert_high"][count]) <= price:
+            if float(self.crypto_dict["price_alert_high"][count]) <= float(price):
 
-                await channel.send(crypto + ' has risen to a selling price of £' + str(price) + ' @everyone')
+                await target_price_channel.send(crypto + ' has risen to a selling price of £' + str(price) + ' @everyone')
 
     @my_background_task.before_loop
     async def before_my_task(self):
@@ -118,22 +135,85 @@ class MyClient(discord.Client):
             self.new_crypto = False
             await message.channel.send("Added " + str(crypto_to_set) + ' to the scanner list!')
 
-        if message.content.startswith('$setalert'):
-            crypto_to_set = message.content[10:]
+        if message.content.startswith('$M'):
+            crypto_to_set = message.content[3:]
+            print(crypto_to_set)
+            crypto = ''
+            crypto_provided_exists = False
+            skipper = False
+            for count, char in enumerate(crypto_to_set):
+                c = count
+                if char == ' ':
+                    break
+                crypto += char
+            if crypto == '':
+                skipper = True
+                await message.channel.send("Please provide a crypto like so : $M <CRYPTO-NICKNAME>")
+            if skipper is not True:
+                crypto = crypto.upper()
+                print(crypto)
+                c = 0
+                for count, crypto_in_dict in enumerate(self.crypto_dict['name']):
+                    if crypto_in_dict == crypto:
+                        crypto_provided_exists = True
+                        c = count
+                        break
+
+                if crypto_provided_exists is True:
+                    self.crypto_dict["mute"][c] = True
+                    await message.channel.send("Muted "+crypto+'.')
+                else:
+                    await message.channel.send("Please provide a valid crypto!")
+
+        if message.content.startswith('$UM'):
+            crypto_to_set = message.content[4:]
+            crypto = ''
+            crypto_provided_exists = False
+            skipper = False
+            for count, char in enumerate(crypto_to_set):
+                c = count
+                if char == ' ':
+                    break
+                crypto += char
+            if crypto == '':
+                skipper = True
+                await message.channel.send("Please provide a crypto like so : $UM <CRYPTO-NICKNAME>")
+            if skipper is not True:
+                crypto = crypto.upper()
+                print(crypto)
+                c = 0
+                for count, crypto_in_dict in enumerate(self.crypto_dict['name']):
+                    if crypto_in_dict == crypto:
+                        crypto_provided_exists = True
+                        c = count
+                        break
+
+                if crypto_provided_exists is True:
+                    self.crypto_dict["mute"][c] = False
+                    await message.channel.send("Muted "+crypto+'.')
+                else:
+                    await message.channel.send("Please provide a valid crypto!")
+
+
+        if message.content.startswith('$SA'):
+            crypto_to_set = message.content[4:]
             crypto = ''
             for count, char in enumerate(crypto_to_set):
                 c = count
                 if char == ' ':
                     break
                 crypto += char
+            crypto = crypto.upper()
+            print(crypto)
             try:
-                number_cut = 11 + c
+                number_cut = 5 + c
                 skip = False
             except UnboundLocalError:
                 skip = True
                 await message.channel.send("Please specify what crypto")
             if skip is False:
                 price_to_alert = message.content[number_cut:]
+                print(price_to_alert)
                 crypto_exists = self.check_if_crypto_exists(crypto)
                 if crypto_exists is True:
                     for count, crypto_to_check in enumerate(self.crypto_dict["name"]):
@@ -155,10 +235,19 @@ class MyClient(discord.Client):
                         self.crypto_dict["price_alert_low"][count] = price_to_alert
 
                         await message.channel.send("Set to alert when " + crypto + ' drops to £' + str(price_to_alert))
+                else:
+                    await message.channel.send("Please provide a valid crypto")
+
+        if message.content.startswith('$RM'):
+
+            # This will be the remove function
+
+            remainder_of_message = message.content[4:]
+            PH_or_PL = remainder_of_message[:2]
+            print(PH_or_PL)
 
 
-
-        if message.content.startswith('$ShowList'):
+        if message.content.startswith('$SL'):
 
             # We want to send the crypto list we are checking to the user
 

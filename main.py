@@ -26,7 +26,7 @@ class MyClient(discord.Client):
         self.min_3 = False
         self.first_run_complete = False
         self.my_background_task.start()
-        self.walit = Client('<COINBASEAPIKEYS>', '<COINBASEAPIKEYS>')
+        self.walit = Client('<APIKEY>', '<APIKEY>')
         pop = self.walit.get_accounts()
         for currency in pop.get('data'):
             self.crypto_dict.get('name').append(currency.get('currency'))
@@ -46,6 +46,7 @@ class MyClient(discord.Client):
             try:
                 data = self.walit.get_buy_price(currency_pair=crypto+'-GBP')
             except NotFoundError:
+                self.crypto_dict['name'].pop(count)
                 continue
             price = data.get('amount')
 
@@ -68,8 +69,6 @@ class MyClient(discord.Client):
             chanel =  self.get_channel(831496686051393537)
             if self.crypto_dict['mute'][count] is True:
                 continue
-            else:
-                await chanel.send(str(crypto) + ' price is £'+str(price))
 
             if float(price) > float(previous_price):
                 live_price = Decimal(price)
@@ -244,7 +243,24 @@ class MyClient(discord.Client):
 
             remainder_of_message = message.content[4:]
             PH_or_PL = remainder_of_message[:2]
-            print(PH_or_PL)
+            crypto_to_Set = message.content[7:]
+            if self.get_crypto_ID(crypto_to_Set) is False:
+                await message.channel.send("Please provide a valid crypto")
+            else:
+                if PH_or_PL == 'PH':
+
+                    ID = self.get_crypto_ID(crypto_to_Set)
+                    self.crypto_dict['price_alert_high'][ID] = None
+                    await message.channel.send('Removed high price alert for '+ crypto_to_Set)
+
+
+                if PH_or_PL == 'PL':
+                    ID = self.get_crypto_ID(crypto_to_Set)
+                    self.crypto_dict['price_alert_low'][ID] = None
+                    await message.channel.send('Removed low price alert for ' + crypto_to_Set)
+                else:
+                    await message.channel.send("Please enter in the format $RM PH/PL <CRYPTO-NAME>")
+
 
 
         if message.content.startswith('$SL'):
@@ -254,6 +270,15 @@ class MyClient(discord.Client):
             await message.channel.send('Scanning these cryptos currently : ' + str(self.crypto_dict["name"]))
 
 
+        if message.content.startswith('$GP'):
+            crypto = message.content[4:]
+            crypto = crypto.upper()
+            if self.get_crypto_ID(crypto) is False:
+                await message.channel.send("Please Provide a valid crypto")
+            else:
+                ID = self.get_crypto_ID(crypto)
+                price = self.crypto_dict['live_price'][ID]
+                await message.channel.send(crypto + ' Price is : £'+str(price))
 
     # Returns true or false if the crypto has been logged in system
 
@@ -265,6 +290,13 @@ class MyClient(discord.Client):
                 return True
         return False
 
+
+    def get_crypto_ID(self, crypto_to_find):
+        for count, crypto in enumerate(self.crypto_dict['name']):
+            if crypto_to_find == crypto:
+                c = count
+                return c
+        return False
 client = MyClient()
-client.run('token')
+client.run('TOKEN')
 
